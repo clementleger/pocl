@@ -24,12 +24,26 @@
 
 #include "pocl_cl.h"
 #include "pocl_llvm.h"
+#include "pocl_hash.h"
 #include "install-paths.h"
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
 #define COMMAND_LENGTH 1024
+
+static inline void
+create_kernel_compute_hash(cl_kernel kernel)
+{
+  SHA1_CTX hash_ctx;
+
+  pocl_SHA1_Init(&hash_ctx);
+  pocl_SHA1_Update(&hash_ctx, kernel->program->build_hash, SHA1_DIGEST_SIZE);
+  pocl_SHA1_Update(&hash_ctx, kernel->function_name, strlen(kernel->function_name));
+  pocl_SHA1_Final(&hash_ctx, kernel->hash);
+
+  return 0;
+}
 
 CL_API_ENTRY cl_kernel CL_API_CALL
 POname(clCreateKernel)(cl_program program,
@@ -98,6 +112,8 @@ POname(clCreateKernel)(cl_program program,
   kernel->context = program->context;
   kernel->program = program;
   kernel->next = NULL;
+
+  create_kernel_compute_hash(kernel);
 
   cl_kernel k = program->kernels;
   program->kernels = kernel;
