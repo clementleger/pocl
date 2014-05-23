@@ -21,6 +21,7 @@ POname(clEnqueueWriteImage)(cl_command_queue    command_queue,
   int num_channels;
   int elem_size;
   _cl_command_node *cmd;
+  cl_event tmp_event;
 
   if (image == NULL)
     return CL_INVALID_MEM_OBJECT;
@@ -56,6 +57,10 @@ POname(clEnqueueWriteImage)(cl_command_queue    command_queue,
       return status;
     }  
 
+  if (blocking_write) {
+    tmp_event = cmd->event;
+    POname(clRetainEvent) (tmp_event);
+  }
   cmd->command.rw_image.device_ptr = 
     image->device_ptrs[command_queue->device->dev_id].mem_ptr;
   cmd->command.rw_image.host_ptr = (void*) ptr;
@@ -65,9 +70,12 @@ POname(clEnqueueWriteImage)(cl_command_queue    command_queue,
   cmd->command.rw_image.slicepitch = image->image_slice_pitch;
   cmd->command.rw_image.buffer = image;
   pocl_command_enqueue(command_queue, cmd);
-  
-  if (blocking_write)
-    status = POname(clFinish) (command_queue);
+
+  if (blocking_write) {
+    POname(clFlush) (command_queue);
+    POname(clWaitForEvents) (1, &tmp_event);
+    POname(clReleaseEvent) (tmp_event);
+  }
     
   return status;
 }

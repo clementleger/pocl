@@ -44,6 +44,7 @@ CL_API_SUFFIX__VERSION_1_0
   int num_channels;
   int elem_size;
   _cl_command_node *cmd;
+  cl_event tmp_event;
 
   if (image == NULL)
     return CL_INVALID_MEM_OBJECT;
@@ -76,6 +77,10 @@ CL_API_SUFFIX__VERSION_1_0
         free (*event);
     }
 
+  if (blocking_read) {
+    tmp_event = cmd->event;
+    POname(clRetainEvent) (tmp_event);
+  }
   cmd->command.rw_image.device_ptr = 
     image->device_ptrs[command_queue->device->dev_id].mem_ptr;
   cmd->command.rw_image.host_ptr = ptr;
@@ -87,8 +92,11 @@ CL_API_SUFFIX__VERSION_1_0
   pocl_command_enqueue(command_queue, cmd);
   POname(clRetainMemObject) (image);  
 
-  if (blocking_read)
-    POname(clFinish) (command_queue);
+  if (blocking_read) {
+    POname(clFlush) (command_queue);
+    POname(clWaitForEvents) (1, &tmp_event);
+    POname(clReleaseEvent) (tmp_event);
+  }
   
   return status;
 }

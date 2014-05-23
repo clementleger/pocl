@@ -41,6 +41,7 @@ POname(clEnqueueWriteBuffer)(cl_command_queue command_queue,
   unsigned i;
   _cl_command_node *cmd = NULL;
   int errcode;
+  cl_event tmp_event;
 
   if (command_queue == NULL)
     return CL_INVALID_COMMAND_QUEUE;
@@ -82,7 +83,11 @@ POname(clEnqueueWriteBuffer)(cl_command_queue command_queue,
                                  event_wait_list);
   if (errcode != CL_SUCCESS)
     return errcode;
-  
+
+  if (blocking_write) {
+    tmp_event = cmd->event;
+    POname(clRetainEvent) (tmp_event);
+  }
   cmd->command.write.host_ptr = ptr;
   cmd->command.write.device_ptr = buffer->device_ptrs[i].mem_ptr+offset;
   cmd->command.write.cb = cb;
@@ -90,8 +95,11 @@ POname(clEnqueueWriteBuffer)(cl_command_queue command_queue,
   POname(clRetainMemObject) (buffer);
   pocl_command_enqueue(command_queue, cmd);
   
-  if (blocking_write)
-    POname(clFinish) (command_queue);
+  if (blocking_write) {
+    POname(clFlush) (command_queue);
+    POname(clWaitForEvents) (1, &tmp_event);
+    POname(clReleaseEvent) (tmp_event);
+  }
 
   return CL_SUCCESS;
 }
